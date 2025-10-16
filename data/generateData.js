@@ -1,5 +1,6 @@
+// data/generateData.js
 const { Pool } = require("pg");
-const faker = require("faker");
+const { faker } = require("@faker-js/faker");
 
 const pool = new Pool({
   user: "postgres",
@@ -10,22 +11,36 @@ const pool = new Pool({
 });
 
 async function generateData() {
-  const batchSize = 1000;
-  for (let i = 0; i < 50; i++) {
-    const values = [];
+  const batchSize = 1000; 
+  const totalBatches = 50; 
+
+  for (let i = 0; i < totalBatches; i++) {
+    const clientValues = [];
+
     for (let j = 0; j < batchSize; j++) {
-      values.push(
-        `('${faker.name.fullName()}', '${faker.internet.email()}', ${faker.datatype.number(
-          { min: 18, max: 80 }
-        )})`
-      );
+      const name = faker.person.fullName().replace(/'/g, "''"); 
+      const email = faker.internet.email().replace(/'/g, "''");
+      const age = faker.number.int({ min: 18, max: 80 });
+
+      clientValues.push(`('${name}', '${email}', ${age})`);
     }
-    await pool.query(
-      `INSERT INTO clients (name, email, age) VALUES ${values.join(",")}`
-    );
-    console.log(`${(i + 1) * batchSize} registros inseridos`);
+
+    const query = `INSERT INTO clients (name, email, age) VALUES ${clientValues.join(
+      ","
+    )}`;
+
+    try {
+      await pool.query(query);
+      console.log(
+        `Batch ${i + 1} inserido: ${(i + 1) * batchSize} registros no total`
+      );
+    } catch (err) {
+      console.error("Erro ao inserir batch:", err);
+    }
   }
-  pool.end();
+
+  await pool.end();
+  console.log("Inserção concluída!");
 }
 
 generateData();
