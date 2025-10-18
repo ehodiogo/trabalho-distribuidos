@@ -11,6 +11,17 @@ cd backend
 nodemon server.js
 ```
 
+3. Criar tabela no banco
+```bash
+docker exec -it postgres-crud psql -U postgres -d crud_db
+CREATE TABLE clients (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    age INT,
+    email VARCHAR(100)
+);
+```
+
 
 #### 
 

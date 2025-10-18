@@ -27,6 +27,15 @@ router.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM clients LIMIT 100");
     console.log("[GET] /clients → Retornando", result.rows.length, "clientes");
+    const countResult = await pool.query("SELECT COUNT(*) FROM clients");
+
+    const totalClients = parseInt(countResult.rows[0].count, 10);
+
+    console.log(
+      "clientes de um total de",
+      totalClients
+    );
+
     res.json(result.rows);
   } catch (err) {
     console.error("[GET] /clients → Erro:", err.message);
