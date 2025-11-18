@@ -60,44 +60,78 @@ services:
       PGPOOL_BACKEND_NODES: "0:pg-primary:5432,1:pg-replica:5432"
       PGPOOL_PARAMS_LISTEN_ADDRESSES: '*'
       PGPOOL_PARAMS_PORT: 5432
-
       PGPOOL_PARAMS_BACKEND_HOSTNAME0: pg-primary
       PGPOOL_PARAMS_BACKEND_PORT0: 5432
       PGPOOL_PARAMS_BACKEND_WEIGHT0: 1
       PGPOOL_PARAMS_BACKEND_FLAG0: ALLOW_TO_FAILOVER
-
       PGPOOL_PARAMS_BACKEND_HOSTNAME1: pg-replica
       PGPOOL_PARAMS_BACKEND_PORT1: 5432
       PGPOOL_PARAMS_BACKEND_WEIGHT1: 1
       PGPOOL_PARAMS_BACKEND_FLAG1: ALLOW_TO_FAILOVER
-
       PGPOOL_POSTGRES_USERNAME: admin
       PGPOOL_POSTGRES_PASSWORD: admin123
-
       PGPOOL_USERNAME: admin
       PGPOOL_PASSWORD: admin123
-
       PGPOOL_LOAD_BALANCE_MODE: true
       PGPOOL_SR_CHECK_PERIOD: 10
     ports:
       - "9999:5432"
 
-  app:
+  app1:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
-    container_name: app-server
+    container_name: app-server1
     restart: always
     depends_on:
       - pgpool
     environment:
       DATABASE_URL: "postgres://admin:admin123@pgpool:5432/appdb"
-    ports:
-      - "3000:3000"
     volumes:
-      - app_data:/app/data
+      - app1_data:/app/data
+
+  app2:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: app-server2
+    restart: always
+    depends_on:
+      - pgpool
+    environment:
+      DATABASE_URL: "postgres://admin:admin123@pgpool:5432/appdb"
+    volumes:
+      - app2_data:/app/data
+
+  app3:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: app-server3
+    restart: always
+    depends_on:
+      - pgpool
+    environment:
+      DATABASE_URL: "postgres://admin:admin123@pgpool:5432/appdb"
+    volumes:
+      - app3_data:/app/data
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-lb
+    restart: always
+    depends_on:
+      - app1
+      - app2
+      - app3
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "3000:80"
 
 volumes:
   pg_primary_data:
   pg_replica_data:
-  app_data:
+  app1_data:
+  app2_data:
+  app3_data:
