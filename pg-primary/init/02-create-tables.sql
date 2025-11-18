@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS clients (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    age INT,
+    email VARCHAR(100)
+);

@@ -1,0 +1,98 @@
+
+services:
+
+  pg-primary:
+    image: postgres:17
+    container_name: pg-primary
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: appdb
+    volumes:
+      - pg_primary_data:/var/lib/postgresql/data
+      - ./pg-primary/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./pg-primary/config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./pg-primary/init:/docker-entrypoint-initdb.d/:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    ports:
+      - "5433:5432"
+    user: postgres
+
+  pg-replica:
+    image: postgres:17
+    container_name: pg-replica
+    restart: always
+    depends_on:
+      - pg-primary
+    environment:
+      PGUSER: replicator
+      PGPASSWORD: repl123
+    user: postgres
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+        chmod 700 /var/lib/postgresql/data;
+        chown -R postgres:postgres /var/lib/postgresql/data;
+        until pg_isready -h pg-primary -U replicator; do
+          echo 'Aguardando primary...';
+          sleep 2;
+        done;
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Inicializando réplica...';
+          pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U replicator -R -X stream;
+          chown -R postgres:postgres /var/lib/postgresql/data;
+          chmod 700 /var/lib/postgresql/data;
+        fi;
+        exec postgres
+      "
+    ports:
+      - "5434:5432"
+
+  pgpool:
+    image: pgpool/pgpool:latest
+    container_name: pgpool
+    restart: always
+    depends_on:
+      - pg-primary
+      - pg-replica
+    environment:
+      PGPOOL_BACKEND_NODES: "0:pg-primary:5432,1:pg-replica:5432"
+      PGPOOL_PARAMS_LISTEN_ADDRESSES: '*'
+      PGPOOL_PARAMS_PORT: 5432
+
+      PGPOOL_PARAMS_BACKEND_HOSTNAME0: pg-primary
+      PGPOOL_PARAMS_BACKEND_PORT0: 5432
+      PGPOOL_PARAMS_BACKEND_WEIGHT0: 1
+      PGPOOL_PARAMS_BACKEND_FLAG0: ALLOW_TO_FAILOVER
+
+      PGPOOL_PARAMS_BACKEND_HOSTNAME1: pg-replica
+      PGPOOL_PARAMS_BACKEND_PORT1: 5432
+      PGPOOL_PARAMS_BACKEND_WEIGHT1: 1
+      PGPOOL_PARAMS_BACKEND_FLAG1: ALLOW_TO_FAILOVER
+
+      PGPOOL_POSTGRES_USERNAME: admin
+      PGPOOL_POSTGRES_PASSWORD: admin123
+
+      PGPOOL_USERNAME: admin
+      PGPOOL_PASSWORD: admin123
+    ports:
+      - "9999:5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: app-server
+    restart: always
+    depends_on:
+      - pgpool
+    environment:
+      DATABASE_URL: "postgres://admin:admin123@pgpool:5432/appdb"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pg_primary_data:
+  pg_replica_data:
